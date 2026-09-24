@@ -1,22 +1,45 @@
 # Dashboard de Concessionárias
 
-Painel somente leitura sobre o banco de dados PostgreSQL de uma rede de concessionárias, construído em Python + Streamlit. Projeto utilizando técnicas de Spec-Driven Development (SDD) com Codex.
+Painel multipágina e somente leitura sobre o banco PostgreSQL de uma rede de
+concessionárias. A aplicação foi construída com Python, Streamlit, SQLAlchemy,
+pandas e Plotly usando práticas de Spec-Driven Development (SDD).
 
 ## Status do projeto
 
-As 3 specs estão implementadas:
+As três especificações previstas estão implementadas:
 
-- [x] **`01-acesso-dados`** — camada de conexão e consultas somente leitura (fundação das demais).
-- [x] **`02-dashboard-executivo`** — visão executiva de vendas para o CEO.
-- [x] **`03-analise-comercial`** — ferramenta operacional para o time comercial.
+| Spec | Status | Entrega |
+| --- | --- | --- |
+| `01-acesso-dados` | Concluída | Conexão PostgreSQL e consultas estritamente somente leitura |
+| `02-dashboard-executivo` | Concluída | Indicadores e comparações executivas |
+| `03-analise-comercial` | Concluída | Análise operacional de vendedores, modelos e descontos |
+
+Última verificação local: **36 testes automatizados aprovados**.
 
 ## Funcionalidades
 
 ### Dashboard Executivo (`pages/1_Dashboard_Executivo.py`)
-Faturamento total, quantidade vendida e ticket médio no período selecionado; evolução diária (faturamento ou quantidade); comparação entre concessionárias (todas, mesmo sem vendas no período) e por estado; projeção simples de fechamento do mês (run-rate) quando o período selecionado é o mês corrente.
+
+- Faturamento total, quantidade vendida e ticket médio por período.
+- Evolução diária por faturamento ou quantidade.
+- Comparações por concessionária, estado e cidade.
+- Exibição de concessionárias sem vendas no período.
+- Projeção simples de fechamento do mês (run-rate) para o mês corrente.
 
 ### Análise Comercial (`pages/2_Analise_Comercial.py`)
-Ranking de vendedores por faturamento/quantidade (filtrável por concessionária), modelos de veículo mais vendidos, desconto médio por vendedor (`veiculos.valor - vendas.valor_pago`, incluindo vendas acima da tabela) e comparação comercial entre todas as concessionárias. Taxa de conversão de funil e veículos parados no pátio estão fora de escopo — o banco não tem tabela de leads/visitas nem de estoque.
+
+- Filtros por período e concessionária aplicados nas consultas SQL.
+- Ranking de vendedores por faturamento ou quantidade vendida.
+- Ticket médio geral, por vendedor e por concessionária.
+- Participação dos modelos vendidos em gráfico de pizza.
+- Desconto médio absoluto e percentual por vendedor e concessionária.
+- Comparação de faturamento, quantidade e ticket entre unidades com vendas.
+- Vendas acima do preço de tabela preservadas como descontos negativos.
+
+O cálculo de desconto usa `veiculos.valor - vendas.valor_pago`. Como o banco
+não mantém histórico do preço de tabela, vendas antigas usam o valor atual do
+veículo. Funil de conversão e veículos parados no pátio permanecem fora do
+escopo porque não existem dados de leads/visitas ou inventário.
 
 ## Estrutura
 
@@ -29,60 +52,108 @@ src/
   database.py                   # Engine SQLAlchemy + psycopg2, guarda de somente-leitura
   queries.py                    # Consultas agregadas parametrizadas por período
   projecao.py                   # Cálculo de run-rate (função pura)
-  formatacao.py                 # Formatação de moeda (pt-BR)
+  formatacao.py                 # Formatação numérica em pt-BR
 tests/                          # Testes automatizados (pytest)
 specs/<pasta>/                  # requirements.md, design.md, tasks.md por spec
 docs/diagrama-banco-dados.png   # Diagrama do banco de dados
-CODEX.md                       # Regras técnicas não-negociáveis do projeto
-prompts.md                      # Prompts prontos para implementar cada spec
+CODEX.md                        # Regras técnicas não negociáveis do projeto
+prompts.md                      # Prompts usados para implementar cada spec
 ```
 
 ## Como rodar
 
 ### Pré-requisitos
+
 - Python 3.11+
-- Acesso de rede ao PostgreSQL da rede de concessionárias (usuário somente leitura)
+- Acesso ao PostgreSQL com o esquema representado em
+  `docs/diagrama-banco-dados.png`
+- Usuário de banco com permissão somente de leitura
 
-### Instalação
+### 1. Criar e ativar o ambiente virtual
+
+Linux ou macOS:
 
 ```bash
-pip install -r requirements.txt
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-### Configuração
+Windows PowerShell:
 
-Crie um arquivo `.env` na raiz do projeto com as credenciais do banco (nunca commitar este arquivo — já está no `.gitignore`):
-
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
 ```
-DB_HOST=...
+
+### 2. Instalar as dependências
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+### 3. Configurar o banco
+
+Copie o arquivo de exemplo:
+
+```bash
+cp .env.example .env
+```
+
+No Windows PowerShell, use `Copy-Item .env.example .env`.
+
+Depois, preencha o `.env` com as credenciais do PostgreSQL:
+
+```dotenv
+DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=...
-DB_USER=...
-DB_PASSWORD=...
+DB_NAME=concessionarias
+DB_USER=usuario_somente_leitura
+DB_PASSWORD=substitua_esta_senha
 ```
 
-Alternativa: usar `st.secrets` (arquivo `.streamlit/secrets.toml`) com as mesmas chaves — `src/database.py` tenta `st.secrets` primeiro e cai para variáveis de ambiente automaticamente.
+O `.env` não deve ser versionado. Como alternativa, configure as mesmas chaves
+em `.streamlit/secrets.toml`. A aplicação procura primeiro em `st.secrets` e
+depois nas variáveis de ambiente ou no `.env`.
 
-### Executar o painel
+### 4. Executar a aplicação
 
 ```bash
-streamlit run app.py
+python -m streamlit run app.py
 ```
 
-Abre em `http://localhost:8501`. A navegação entre "Dashboard Executivo" e "Análise Comercial" aparece na barra lateral.
+Abra `http://localhost:8501`. A barra lateral permite navegar entre a página
+inicial, o Dashboard Executivo e a Análise Comercial.
 
-### Rodar os testes
+### 5. Rodar os testes
 
 ```bash
-pytest tests/
+python -m pytest -q
 ```
 
-Cobrem: bloqueio de qualquer SQL de escrita, presença de filtro de período em toda consulta que toca `vendas`, e a fórmula de projeção (run-rate).
+Os testes cobrem a proteção contra SQL de escrita, parametrização e filtros das
+consultas, cálculos, projeção mensal e renderização das páginas Streamlit.
+
+## Solução de problemas
+
+- **Configuração incompleta:** confirme se todas as cinco variáveis `DB_*`
+  estão definidas e se `DB_PORT` é um número válido.
+- **Falha de conexão:** verifique host, porta, VPN/rede e permissões do usuário.
+- **Página sem dados:** revise o período selecionado e confirme se existem
+  vendas para os filtros aplicados.
+- **Porta 8501 ocupada:** execute com outra porta, por exemplo
+  `python -m streamlit run app.py --server.port 8502`.
 
 ## Regras técnicas
 
-Este projeto segue regras não-negociáveis definidas em `CODEX.md`: acesso somente leitura ao banco, credenciais fora do código-fonte, filtro de período sempre na query SQL, cache (`st.cache_data`) com TTL de ~1 min para agregações simples e 15 min para consultas com múltiplos joins, sem autenticação nesta versão (uso interno).
+Este projeto segue as regras definidas em `CODEX.md`: banco somente leitura,
+credenciais fora do código-fonte, filtro de período dentro da SQL, consultas
+parametrizadas e cache com aproximadamente 1 minuto para agregações simples e
+15 minutos para consultas com múltiplos joins. Não há autenticação nesta versão,
+destinada a uso interno.
 
 ## Como implementar/revisar uma spec
 
-Abra o CODEX Code na raiz desta pasta e use os prompts de `prompts.md`, um por spec, na ordem numérica (`specs/01-acesso-dados`, `specs/02-dashboard-executivo`, `specs/03-analise-comercial`).
+Consulte `requirements.md`, `design.md` e `tasks.md` dentro da pasta da spec.
+As especificações são numeradas porque as funcionalidades posteriores dependem
+da camada de acesso a dados. Os prompts utilizados no fluxo estão em
+`prompts.md`.
